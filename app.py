@@ -9,8 +9,8 @@ def load_assets():
         rf_model = joblib.load('model.pkl')
         model, encoders, target_encoder = load_assets()
     
-except Exception as e:
-    st.error(f"🚨 THE REAL ERROR IS: {e}")
+    except Exception as e:
+        st.error(f"🚨 THE REAL ERROR IS: {e}")
 
 
 model, encoders, target_encoder = load_assets()
