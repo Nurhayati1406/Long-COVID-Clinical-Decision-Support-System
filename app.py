@@ -6,16 +6,11 @@ import joblib
 @st.cache_resource
 def load_assets():
     try:
-        # Load the file
-        saved_assets = joblib.load('model.pkl')
+        # Load all three files separately!
+        model = joblib.load('model.pkl')
+        encoders = joblib.load('encoders.pkl')
+        target_encoder = joblib.load('target_encoder.pkl')
         
-        # Depending on how you saved it in your training script, unpack it
-        # Assuming you saved a tuple: (model, encoders, target_encoder)
-        model = saved_assets[0]
-        encoders = saved_assets[1]
-        target_encoder = saved_assets[2]
-        
-        # RETURN them to the dashboard (This breaks the loop!)
         return model, encoders, target_encoder
         
     except Exception as e:
