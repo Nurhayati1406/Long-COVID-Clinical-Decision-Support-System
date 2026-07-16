@@ -23,7 +23,7 @@ model, encoders, target_encoder = load_assets()
 
 # --- 2. SET UP THE DASHBOARD UI ---
 st.set_page_config(page_title="Long COVID CDSS", layout="wide")
-st.title("Zx Long COVID Clinical Decision Support System")
+st.title("🩺 Long COVID Clinical Decision Support System")
 st.markdown("Enter patient acute infection details to predict the risk of developing Brain Fog post-recovery.")
 
 if model is None:
