@@ -6,13 +6,23 @@ import joblib
 @st.cache_resource
 def load_assets():
     try:
-        rf_model = joblib.load('model.pkl')
-        model, encoders, target_encoder = load_assets()
-    
+        # Load the file
+        saved_assets = joblib.load('model.pkl')
+        
+        # Depending on how you saved it in your training script, unpack it
+        # Assuming you saved a tuple: (model, encoders, target_encoder)
+        model = saved_assets[0]
+        encoders = saved_assets[1]
+        target_encoder = saved_assets[2]
+        
+        # RETURN them to the dashboard (This breaks the loop!)
+        return model, encoders, target_encoder
+        
     except Exception as e:
         st.error(f"🚨 THE REAL ERROR IS: {e}")
+        return None, None, None
 
-
+# Call the function OUTSIDE the loop, pushed to the left wall
 model, encoders, target_encoder = load_assets()
 
 # --- 2. SET UP THE DASHBOARD UI ---
