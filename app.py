@@ -10,8 +10,7 @@ def load_assets():
         encoders = joblib.load('encoders.pkl')
         target_encoder = joblib.load('target_encoder.pkl')
         return model, encoders, target_encoder
-    except Exception as e:
-        st.error(f"The file is here, but it crashed! The real error is: {e}")
+
 
 model, encoders, target_encoder = load_assets()
 
