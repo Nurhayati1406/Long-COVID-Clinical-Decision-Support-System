@@ -5,11 +5,12 @@ import joblib
 # --- 1. LOAD THE TRAINED MODEL AND ENCODERS ---
 @st.cache_resource
 def load_assets():
-    try:
-        model = joblib.load('model.pkl')
-        encoders = joblib.load('encoders.pkl')
-        target_encoder = joblib.load('target_encoder.pkl')
-        return model, encoders, target_encoder
+try:
+    rf_model = joblib.load('model.pkl')
+    model, encoders, target_encoder = load_assets()
+    
+except Exception as e:
+    st.error(f"🚨 THE REAL ERROR IS: {e}")
 
 
 model, encoders, target_encoder = load_assets()
