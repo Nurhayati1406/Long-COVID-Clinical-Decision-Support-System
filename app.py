@@ -4,7 +4,6 @@ import joblib
 import numpy as np
 
 # --- 1. SET UP THE DASHBOARD UI ---
-# (Moved to the top before any visual elements are rendered)
 st.set_page_config(page_title="Long COVID CDSS", page_icon="🩺", layout="wide")
 
 # --- 2. LOAD THE TRAINED MODEL AND ENCODERS ---
@@ -21,7 +20,7 @@ def load_assets():
 
 model, encoders, target_encoder = load_assets()
 
-# Initialize session state for prediction so it doesn't disappear on widget interaction
+# Initialize session state so results don't disappear
 if 'prediction' not in st.session_state:
     st.session_state.prediction = None
 if 'probability' not in st.session_state:
@@ -54,44 +53,43 @@ else:
         'Physical_Activity_Level': [physical_activity]
     })
 
+    # Pre-process the data immediately so it is always available for SHAP
+    processed_data = input_data.copy()
+    processed_data['Gender'] = encoders['Gender'].transform(processed_data['Gender'])
+    processed_data['COVID_Severity'] = encoders['COVID_Severity'].transform(processed_data['COVID_Severity'])
+    processed_data['Hospitalized'] = encoders['Hospitalized'].transform(processed_data['Hospitalized'])
+    processed_data['Physical_Activity_Level'] = encoders['Physical_Activity_Level'].transform(processed_data['Physical_Activity_Level'])
+
     # --- LAYOUT: COLUMNS ---
-    col1, col2 = st.columns([1, 1.5]) # Left column slightly narrower than right
+    col1, col2 = st.columns([1, 1.5]) 
 
     with col1:
         st.subheader("Patient Profile Summary")
-        # Transpose table for better vertical reading in a column
         st.table(input_data.T.rename(columns={0: "Patient Data"})) 
 
     with col2:
         st.subheader("Risk Assessment Engine")
         
-        # --- PREDICTION LOGIC ---
+        # --- PREDICTION BUTTON ---
         if st.button("Predict Long COVID Risk", type="primary"):
             with st.spinner("Analyzing complex relationships in healthcare data..."):
-                # Data processing
-                processed_data = input_data.copy()
-                processed_data['Gender'] = encoders['Gender'].transform(processed_data['Gender'])
-                processed_data['COVID_Severity'] = encoders['COVID_Severity'].transform(processed_data['COVID_Severity'])
-                processed_data['Hospitalized'] = encoders['Hospitalized'].transform(processed_data['Hospitalized'])
-                processed_data['Physical_Activity_Level'] = encoders['Physical_Activity_Level'].transform(processed_data['Physical_Activity_Level'])
                 
                 # Make prediction
                 raw_prediction = model.predict(processed_data)
                 final_prediction = target_encoder.inverse_transform(raw_prediction)[0]
                 
-                # Check if model supports probabilities for better clinical context
+                # Check for probabilities
                 if hasattr(model, "predict_proba"):
                     probs = model.predict_proba(processed_data)[0]
-                    # Assuming target class 1 is "Yes" (Brain Fog). Adjust index if needed.
                     risk_prob = np.max(probs) * 100 
                     st.session_state.probability = f"{risk_prob:.1f}% confidence"
                 else:
-                    st.session_state.probability = "Probability not available for this model type"
+                    st.session_state.probability = "Probability not available"
 
                 # Save to session state
                 st.session_state.prediction = final_prediction
 
-        # --- DISPLAY RESULTS (Using session state) ---
+        # --- DISPLAY RESULTS & SHAP ---
         if st.session_state.prediction is not None:
             st.success("Analysis Complete!")
             
@@ -102,44 +100,27 @@ else:
             if st.session_state.probability:
                 metric_col2.metric(label="Model Confidence / Risk", value=st.session_state.probability)
             
-            # Future deployment note
-            st.info("💡 Note: In future deployments, this panel will integrate Explainable AI (SHAP) to visually illustrate how features like Age and COVID Severity contributed to this specific prediction.")
-
-shap
-matplotlib
-
-# --- NEW: SHAP EXPLAINABILITY ---
-        st.markdown("---")
-        st.subheader("📊 Prediction Explanation (SHAP)")
-        st.write("This chart shows exactly which factors increased (red) or decreased (blue) the patient's risk.")
-        
-        with st.spinner("Generating AI explanation..."):
-            try:
-                import shap
-                import matplotlib.pyplot as plt
-                
-                # 1. Initialize the Explainer
-                # shap.Explainer works well for most models. 
-                # (Note: If using a neural network, you might need shap.DeepExplainer)
-                explainer = shap.Explainer(model) 
-                
-                # 2. Calculate SHAP values for this specific patient's processed data
-                shap_values = explainer(processed_data)
-                
-                # 3. Create a matplotlib figure to hold the SHAP plot
-                fig, ax = plt.subplots(figsize=(8, 5))
-                
-                # 4. Generate the Waterfall plot (great for single-patient explanations)
-                # shap_values[0] targets the single row of input data we have
-                shap.plots.waterfall(shap_values[0], show=False) 
-                
-                # 5. Display the plot in Streamlit
-                st.pyplot(fig)
-                
-                # Clean up matplotlib memory to prevent app slowdowns over time
-                plt.clf() 
-                
-            except ImportError:
-                st.error("⚠️ Missing libraries. Please run: pip install shap matplotlib")
-            except Exception as e:
-                st.warning(f"Could not generate SHAP explanation for this specific model type. Error: {e}")
+            # --- SHAP EXPLAINABILITY ---
+            st.markdown("---")
+            st.subheader("📊 Prediction Explanation (SHAP)")
+            st.write("This chart shows exactly which factors increased (red) or decreased (blue) the patient's risk.")
+            
+            with st.spinner("Generating AI explanation..."):
+                try:
+                    import shap
+                    import matplotlib.pyplot as plt
+                    
+                    # Generate SHAP explanation
+                    explainer = shap.Explainer(model) 
+                    shap_values = explainer(processed_data)
+                    
+                    # Plot
+                    fig, ax = plt.subplots(figsize=(8, 5))
+                    shap.plots.waterfall(shap_values[0], show=False) 
+                    st.pyplot(fig)
+                    plt.clf() 
+                    
+                except ImportError:
+                    st.error("⚠️ Missing libraries. Please ensure 'shap' and 'matplotlib' are in your requirements.txt file.")
+                except Exception as e:
+                    st.warning(f"Could not generate SHAP explanation for this model type. Error: {e}")
