@@ -1,35 +1,40 @@
-# Forcing the server to reboot!
 import streamlit as st
 import pandas as pd
 import joblib
+import numpy as np
 
-# --- 1. LOAD THE TRAINED MODEL AND ENCODERS ---
+# --- 1. SET UP THE DASHBOARD UI ---
+# (Moved to the top before any visual elements are rendered)
+st.set_page_config(page_title="Long COVID CDSS", page_icon="🩺", layout="wide")
+
+# --- 2. LOAD THE TRAINED MODEL AND ENCODERS ---
 @st.cache_resource
 def load_assets():
     try:
-        # Load all three files separately!
         model = joblib.load('model.pkl')
         encoders = joblib.load('encoders.pkl')
         target_encoder = joblib.load('target_encoder.pkl')
-        
         return model, encoders, target_encoder
-        
     except Exception as e:
-        st.error(f"🚨 THE REAL ERROR IS: {e}")
+        st.error(f"🚨 Failed to load model assets. Error: {e}")
         return None, None, None
 
-# Call the function OUTSIDE the loop, pushed to the left wall
 model, encoders, target_encoder = load_assets()
 
-# --- 2. SET UP THE DASHBOARD UI ---
-st.set_page_config(page_title="Long COVID CDSS", layout="wide")
+# Initialize session state for prediction so it doesn't disappear on widget interaction
+if 'prediction' not in st.session_state:
+    st.session_state.prediction = None
+if 'probability' not in st.session_state:
+    st.session_state.probability = None
+
+# --- 3. MAIN APP ---
 st.title("🩺 Long COVID Clinical Decision Support System")
 st.markdown("Enter patient acute infection details to predict the risk of developing Brain Fog post-recovery.")
 
-if model is None:
-    st.warning("G 'model.pkl' not found. Please run your training script or cell first to generate the model assets!")
+if model is None or encoders is None:
+    st.warning("⚠️ Model assets not found. Please ensure 'model.pkl', 'encoders.pkl', and 'target_encoder.pkl' are in the same directory.")
 else:
-    # --- 3. SIDEBAR: PATIENT DATA INPUT ---
+    # --- SIDEBAR: PATIENT DATA INPUT ---
     st.sidebar.header("Patient History Input")
 
     age = st.sidebar.number_input("Age", min_value=18, max_value=100, value=30)
@@ -49,24 +54,53 @@ else:
         'Physical_Activity_Level': [physical_activity]
     })
 
-    st.subheader("Patient Profile Summary")
-    st.table(input_data)
+    # --- LAYOUT: COLUMNS ---
+    col1, col2 = st.columns([1, 1.5]) # Left column slightly narrower than right
 
-    # --- 4. PREDICTION ENGINE ---
-    st.markdown("---")
-    st.subheader("Risk Assessment Engine")
+    with col1:
+        st.subheader("Patient Profile Summary")
+        # Transpose table for better vertical reading in a column
+        st.table(input_data.T.rename(columns={0: "Patient Data"})) 
 
-    if st.button("Predict Long COVID Risk"):
-        with st.spinner("Analyzing complex relationships in healthcare data..."):
-            processed_data = input_data.copy()
-            processed_data['Gender'] = encoders['Gender'].transform(processed_data['Gender'])
-            processed_data['COVID_Severity'] = encoders['COVID_Severity'].transform(processed_data['COVID_Severity'])
-            processed_data['Hospitalized'] = encoders['Hospitalized'].transform(processed_data['Hospitalized'])
-            processed_data['Physical_Activity_Level'] = encoders['Physical_Activity_Level'].transform(processed_data['Physical_Activity_Level'])
-            
-            raw_prediction = model.predict(processed_data)
-            final_prediction = target_encoder.inverse_transform(raw_prediction)[0]
-            
+    with col2:
+        st.subheader("Risk Assessment Engine")
+        
+        # --- PREDICTION LOGIC ---
+        if st.button("Predict Long COVID Risk", type="primary"):
+            with st.spinner("Analyzing complex relationships in healthcare data..."):
+                # Data processing
+                processed_data = input_data.copy()
+                processed_data['Gender'] = encoders['Gender'].transform(processed_data['Gender'])
+                processed_data['COVID_Severity'] = encoders['COVID_Severity'].transform(processed_data['COVID_Severity'])
+                processed_data['Hospitalized'] = encoders['Hospitalized'].transform(processed_data['Hospitalized'])
+                processed_data['Physical_Activity_Level'] = encoders['Physical_Activity_Level'].transform(processed_data['Physical_Activity_Level'])
+                
+                # Make prediction
+                raw_prediction = model.predict(processed_data)
+                final_prediction = target_encoder.inverse_transform(raw_prediction)[0]
+                
+                # Check if model supports probabilities for better clinical context
+                if hasattr(model, "predict_proba"):
+                    probs = model.predict_proba(processed_data)[0]
+                    # Assuming target class 1 is "Yes" (Brain Fog). Adjust index if needed.
+                    risk_prob = np.max(probs) * 100 
+                    st.session_state.probability = f"{risk_prob:.1f}% confidence"
+                else:
+                    st.session_state.probability = "Probability not available for this model type"
+
+                # Save to session state
+                st.session_state.prediction = final_prediction
+
+        # --- DISPLAY RESULTS (Using session state) ---
+        if st.session_state.prediction is not None:
             st.success("Analysis Complete!")
-            st.metric(label="Predicted Brain Fog Outcome", value=final_prediction)
-            st.info("B Note: In future deployments, this panel will integrate Explainable AI (SHAP) to visually illustrate how features like Age and COVID Severity contributed to this specific prediction.")
+            
+            # Display metrics visually
+            metric_col1, metric_col2 = st.columns(2)
+            metric_col1.metric(label="Predicted Brain Fog Outcome", value=st.session_state.prediction)
+            
+            if st.session_state.probability:
+                metric_col2.metric(label="Model Confidence / Risk", value=st.session_state.probability)
+            
+            # Future deployment note
+            st.info("💡 Note: In future deployments, this panel will integrate Explainable AI (SHAP) to visually illustrate how features like Age and COVID Severity contributed to this specific prediction.")
