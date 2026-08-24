@@ -105,5 +105,3 @@ else:
             # Future deployment note
             st.info("💡 Note: In future deployments, this panel will integrate Explainable AI (SHAP) to visually illustrate how features like Age and COVID Severity contributed to this specific prediction.")
 
-pip install shap matplotlib
-
