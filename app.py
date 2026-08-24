@@ -104,3 +104,41 @@ else:
             
             # Future deployment note
             st.info("💡 Note: In future deployments, this panel will integrate Explainable AI (SHAP) to visually illustrate how features like Age and COVID Severity contributed to this specific prediction.")
+
+pip install shap matplotlib
+
+# --- NEW: SHAP EXPLAINABILITY ---
+        st.markdown("---")
+        st.subheader("📊 Prediction Explanation (SHAP)")
+        st.write("This chart shows exactly which factors increased (red) or decreased (blue) the patient's risk.")
+        
+        with st.spinner("Generating AI explanation..."):
+            try:
+                import shap
+                import matplotlib.pyplot as plt
+                
+                # 1. Initialize the Explainer
+                # shap.Explainer works well for most models. 
+                # (Note: If using a neural network, you might need shap.DeepExplainer)
+                explainer = shap.Explainer(model) 
+                
+                # 2. Calculate SHAP values for this specific patient's processed data
+                shap_values = explainer(processed_data)
+                
+                # 3. Create a matplotlib figure to hold the SHAP plot
+                fig, ax = plt.subplots(figsize=(8, 5))
+                
+                # 4. Generate the Waterfall plot (great for single-patient explanations)
+                # shap_values[0] targets the single row of input data we have
+                shap.plots.waterfall(shap_values[0], show=False) 
+                
+                # 5. Display the plot in Streamlit
+                st.pyplot(fig)
+                
+                # Clean up matplotlib memory to prevent app slowdowns over time
+                plt.clf() 
+                
+            except ImportError:
+                st.error("⚠️ Missing libraries. Please run: pip install shap matplotlib")
+            except Exception as e:
+                st.warning(f"Could not generate SHAP explanation for this specific model type. Error: {e}")
